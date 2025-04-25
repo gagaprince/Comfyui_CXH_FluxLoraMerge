@@ -271,6 +271,41 @@ def additive_merge_multiple(tensors):
     except Exception as e:
         print(f"Error in additive_merge_multiple: {e}")
         return torch.zeros_like(tensors[0])
+    
+# 自定义方法
+    
+def merge_loras_custom(main_lora_model, merge_lora_model, weight1,  weight2):
+    """Merges two LoRA models using custom weight percentages."""
+    merged_model = merge_loras_weighted_custom(main_lora_model, merge_lora_model, weight1, weight2)
+    return [merged_model]
+
+
+def merge_loras_weighted_custom(main_lora_model, merge_lora_model, main_weight,  merge_weight):
+    """Merges two LoRA models using adaptive or manual merge with a specified main weight."""
+    merged_model = {}
+    all_keys = set(main_lora_model.keys()).union(set(merge_lora_model.keys()))
+
+    with tqdm(total=len(all_keys), desc="Merging LoRA models", unit="layer") as pbar:
+        for key in all_keys:
+            if key in main_lora_model and key in merge_lora_model:
+                merged_model[key] = manual_merge_custom(main_lora_model[key], merge_lora_model[key], main_weight, merge_weight)
+            elif key in main_lora_model:
+                merged_model[key] = main_lora_model[key]
+            else:
+                merged_model[key] = merge_lora_model[key]
+            pbar.update(1)
+
+    return merged_model
+
+
+def manual_merge_custom(tensor1, tensor2, main_weight, merge_weight):
+    """Merges two tensors using fixed weights based on user input."""
+    if tensor1.size() != tensor2.size():
+        tensor1, tensor2 = pad_tensors(tensor1, tensor2)
+
+    return main_weight * tensor1 + merge_weight * tensor2
+
+# 自定义方法
 
 
 class CXH_Lora_Merge:
@@ -285,8 +320,9 @@ class CXH_Lora_Merge:
                 "savename":   ("STRING", {"multiline": False, "default": ""},), 
                 "main_lora": (folder_paths.get_filename_list("loras"), {"tooltip": "The name of the merged LoRA."}),
                 "merge_lora": (folder_paths.get_filename_list("loras"), {"tooltip": "The name of the merged LoRA."}),
-                "merge_type": (["adaptive", "manual","additive"],),
+                "merge_type": (["adaptive", "manual","additive", "custom"],),
                 "weight":("INT", {"default": 50, "min": 0, "max": 100, "step": 1}),
+                "weight2":("INT", {"default": 50, "min": 0, "max": 100, "step": 1})
                
             }
         }
@@ -297,7 +333,7 @@ class CXH_Lora_Merge:
     OUTPUT_NODE = True
     CATEGORY = "CXH/model"
 
-    def gen(self,savename ,main_lora,merge_lora,merge_type,weight,):
+    def gen(self,savename ,main_lora,merge_lora,merge_type,weight,weight2):
         
         lora_path_1  = os.path.join(folder_paths.models_dir,"loras",main_lora)
         lora_path_2  = os.path.join(folder_paths.models_dir,"loras",merge_lora)
@@ -312,6 +348,8 @@ class CXH_Lora_Merge:
         elif merge_type == 'additive':
             merged_model = additive_merge(main_lora_model, merge_lora_model, weight / 100)
             merged_models = [(weight / 100, merged_model)]
+        elif merge_type == 'custom':
+            merged_models = merge_loras_custom(main_lora_model, merge_lora_model, weight, weight2)
         else:  # Weighted
             merged_model = merge_loras_weighted(main_lora_model, merge_lora_model, weight / 100, merge_type)
             merged_models = [(weight / 100, merged_model)]
