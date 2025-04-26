@@ -277,7 +277,7 @@ def additive_merge_multiple(tensors):
 def merge_loras_custom(main_lora_model, merge_lora_model, weight1,  weight2):
     """Merges two LoRA models using custom weight percentages."""
     merged_model = merge_loras_weighted_custom(main_lora_model, merge_lora_model, weight1, weight2)
-    return [merged_model]
+    return [(weight1 / 100, merged_model)]
 
 
 def merge_loras_weighted_custom(main_lora_model, merge_lora_model, main_weight,  merge_weight):
@@ -335,11 +335,17 @@ class CXH_Lora_Merge:
 
     def gen(self,savename ,main_lora,merge_lora,merge_type,weight,weight2):
         
-        lora_path_1  = os.path.join(folder_paths.models_dir,"loras",main_lora)
-        lora_path_2  = os.path.join(folder_paths.models_dir,"loras",merge_lora)
-        save_lora  = os.path.join(folder_paths.models_dir,"loras",savename+".safetensors")
+        # lora_path_1  = os.path.join(folder_paths.models_dir,"loras",main_lora)
+        lora_path_1  = folder_paths.get_full_path("loras", main_lora)
+        # folder_paths.get_full_path("loras", lora_name)
+        # lora_path_2  = os.path.join(folder_paths.models_dir,"loras",merge_lora)
+        lora_path_2  = folder_paths.get_full_path("loras", merge_lora)
+        # save_lora  = os.path.join(folder_paths.models_dir,"loras",savename+".safetensors")
+
+        print("lora_path_1:", lora_path_1)
+        save_lora  = os.path.join(os.path.dirname(lora_path_1), savename+".safetensors")
+        print("save_lora:",save_lora)
         
-        print(lora_path_1)
         main_lora_model = load_file(lora_path_1)
         merge_lora_model = load_file(lora_path_2)
         
@@ -349,7 +355,7 @@ class CXH_Lora_Merge:
             merged_model = additive_merge(main_lora_model, merge_lora_model, weight / 100)
             merged_models = [(weight / 100, merged_model)]
         elif merge_type == 'custom':
-            merged_models = merge_loras_custom(main_lora_model, merge_lora_model, weight, weight2)
+            merged_models = merge_loras_custom(main_lora_model, merge_lora_model, weight/100, weight2/100)
         else:  # Weighted
             merged_model = merge_loras_weighted(main_lora_model, merge_lora_model, weight / 100, merge_type)
             merged_models = [(weight / 100, merged_model)]
